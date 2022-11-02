@@ -11,32 +11,22 @@ export class App extends Component {
   state = {
     query: null,
     images: [],
-    status: 'idle',
     page: 1,
-    largeImg: null,
+    largeImageURL: null,
     error: null,
-    loadMore: false,
+    status: 'idle',
   };
 
   setQuery = query => {
-    this.setState({
-      query: null,
-      images: [],
-      status: 'idle',
-      page: 1,
-      largeImg: null,
-      error: null,
-      loadMore: false,
-    });
-    this.setState({ query, status: 'pending' });
+    this.setState({ query, images: [], page: 1 });
   };
 
-  onLoadMore = async () => {
-    await this.setState(pS => ({ page: pS.page + 1 }));
-    this.fetchImages(this.state.query);
+  onLoadMore = () => {
+    this.setState(pS => ({ page: pS.page + 1 }));
   };
 
-  async fetchImages(searchQuery) {
+  async fetchImages(searchQuery, page) {
+    this.setState({ status: 'pending' });
     const key = '30339052-e4d079f5519c217cf05ffdccc';
     const per_page = 12;
     axios.defaults.baseURL = 'https://pixabay.com/';
@@ -44,7 +34,7 @@ export class App extends Component {
       const result = await axios.get('api/', {
         params: {
           q: searchQuery,
-          page: this.state.page,
+          page,
           per_page,
           key,
           image_type: 'photo',
@@ -52,11 +42,6 @@ export class App extends Component {
         },
       });
       const images = result.data.hits;
-
-      result.data.totalHits - this.state.images.length > per_page
-        ? this.setState({ loadMore: true })
-        : this.setState({ loadMore: false });
-
       images.length > 0
         ? this.setState(pS => ({
             images: [...pS.images, ...images],
@@ -66,35 +51,35 @@ export class App extends Component {
     } catch (error) {
       this.setState({ error: error.message, status: 'rejected' });
       throw new Error();
-    }
+    } 
+    // finally {
+    //   this.setState({ status: 'resolved' });
+    // }
   }
 
-  openImage = id => {
-    const { images } = this.state;
-    const searchedImg = images.find(image => image.id === id);
-    this.setState({ largeImg: searchedImg.largeImageURL });
+  openImage = largeImageURL => {
+    this.setState({ largeImageURL });
   };
 
   closeImage = e => {
-    if (e.target === e.currentTarget) this.setState({ largeImg: null });
+    if (e.target === e.currentTarget) this.setState({ largeImageURL: null });
   };
 
   closeOnEscape = () => {
-    this.setState({ largeImg: null });
+    this.setState({ largeImageURL: null });
   };
 
   componentDidUpdate(prevProps, prevState, snapshot) {
-    const { images, query} = this.state;
-    if (prevState.query !== query) {
-      this.fetchImages(query);
+    const { images, query, page } = this.state;
+    if (prevState.query !== query || prevState.page !== page) {
+      this.fetchImages(query, page);
     }
-
     if (
       prevState.images.length !== 0 &&
       images.length > prevState.images.length
     )
       window.scrollTo({
-        top: snapshot - 144,
+        top: snapshot -260,
         behavior: 'smooth',
       });
   }
@@ -103,16 +88,21 @@ export class App extends Component {
     return document.body.clientHeight;
   }
   render() {
-    const { images, status, loadMore, largeImg } = this.state;
+    const { images, status, largeImageURL } = this.state;
     return (
       <div className={css.app}>
         <SearchBar setQuery={this.setQuery} />
-        {status === 'resolved' && (<ImageGallery images={images} openImage={this.openImage} /> )}
+        <ImageGallery images={images} openImage={this.openImage} />
         {status === 'pending' && <Loader />}
-        {status === 'rejected' && <p>No images...</p>}
-        {loadMore && <Button onLoadMore={this.onLoadMore} />}
-        {largeImg && (
-        <Modal largeImg={largeImg} closeImage={this.closeImage} closeOnEscape={this.closeOnEscape} /> )}
+        {status === 'rejected' && <p className={css.noImage}>No images...</p>}
+        {status === 'resolved' && <Button onLoadMore={this.onLoadMore} />}
+        {largeImageURL && (
+          <Modal
+            largeImageURL={largeImageURL}
+            closeImage={this.closeImage}
+            closeOnEscape={this.closeOnEscape}
+          />
+        )}
       </div>
     );
   }
